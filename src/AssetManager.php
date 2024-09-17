@@ -12,7 +12,7 @@ class AssetManager
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.2';
+    const VERSION = '1.0.3';
     /**
      * Path to the Webpack-generated manifest.json file.
      *
@@ -89,7 +89,7 @@ class AssetManager
      * @return string The full URL to the asset.
      * @throws Exception
      */
-    public function asset(string $asset): string
+    public static function asset(string $asset): string
     {
         if (!self::$manifestPath) {
             throw new Exception('Manifest path is not set.');
@@ -119,7 +119,7 @@ class AssetManager
      * @return void
      * @throws Exception
      */
-    public function enqueueBundle(string $entry, string $namespace = ''): void
+    public static function enqueueBundle(string $entry, string $namespace = ''): void
     {
         if (!$entry) {
             return;
