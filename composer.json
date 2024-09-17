@@ -2,7 +2,7 @@
   "name": "milbareu/wordpress-webpack-asset-manager",
   "description": "A WordPress asset manager for handling Webpack's manifest.json and enqueuing assets with dependencies.",
   "type": "library",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "autoload": {
     "psr-4": {
       "MB\\WPAssets\\": "src/"

@@ -22,12 +22,16 @@ jobs:
       - name: Install dependencies
         run: composer install
 
+      - name: Extract tag name
+        id: extract_tag
+        run: echo "::set-output name=TAG_NAME::${GITHUB_REF##*/}"
+
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref }} # Uses the pushed tag as release version
-          name: Release ${{ github.ref }} # Names the release after the tag
+          tag_name: ${{ steps.extract_tag.outputs.TAG_NAME }} # Uses the extracted tag name
+          name: Release ${{ steps.extract_tag.outputs.TAG_NAME }} # Names the release after the tag
           body: |
             ## Changelog
             - Auto-release by GitHub Actions.

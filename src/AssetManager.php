@@ -12,7 +12,7 @@ class AssetManager
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.1';
+    const VERSION = '1.0.2';
     /**
      * Path to the Webpack-generated manifest.json file.
      *
