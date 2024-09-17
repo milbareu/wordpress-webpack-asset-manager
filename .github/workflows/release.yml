@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Matches version tags like v1.0.0
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4' # Adjust PHP version as needed
+
+      - name: Install dependencies
+        run: composer install
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }} # Uses the pushed tag as release version
+          name: Release ${{ github.ref }} # Names the release after the tag
+          body: |
+            ## Changelog
+            - Auto-release by GitHub Actions.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub
+
+      - name: Upload Release Asset
+        uses: actions/upload-artifact@v3
+        with:
+          name: AssetManager
+          path: ./ # Modify the path to include files like PHP files, assets, or other release assets

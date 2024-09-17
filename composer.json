@@ -1,0 +1,30 @@
+{
+  "name": "milbareu/wordpress-webpack-asset-manager",
+  "description": "A WordPress asset manager for handling Webpack's manifest.json and enqueuing assets with dependencies.",
+  "type": "library",
+  "version": "0.1.0",
+  "autoload": {
+    "psr-4": {
+      "MB\\WPAssets\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=7.2",
+    "ext-json": "*"
+  },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Milan Bartalovics",
+      "email": "b.milan@milbar.eu"
+    }
+  ],
+  "keywords": [
+    "wordpress",
+    "webpack",
+    "assets",
+    "dependency",
+    "enqueue",
+    "manifest"
+  ]
+}
