@@ -10,6 +10,10 @@ use Exception;
 class AssetManager
 {
     /**
+     * Version of the AssetManager module.
+     */
+    const VERSION = '1.0.0';
+    /**
      * Path to the Webpack-generated manifest.json file.
      *
      * @var string
@@ -55,6 +59,16 @@ class AssetManager
 
         // Automatically set the manifest path to the output directory + manifest file.
         self::$manifestPath = self::getBaseUrl() . '/' . $this->manifestFile;
+    }
+
+    /**
+     * Get the version of the AssetManager module.
+     *
+     * @return string
+     */
+    public static function getVersion(): string
+    {
+        return self::VERSION;
     }
 
     /**
