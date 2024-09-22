@@ -2,8 +2,10 @@
 
 ## Introduction
 
-WPAssets is a PHP class designed to manage assets in WordPress. It integrates with Webpack's manifest.json and
-entrypoints.json files, automatically enqueuing CSS, JS, and handling PHP dependencies in a structured and scalable way.
+WPAssets is a PHP class designed to manage assets in WordPress. It integrates with Webpack's manifest.json files,
+automatically enqueuing CSS, JS, and handling PHP dependencies (
+with [Dependency Extraction Webpack Plugin](https://www.npmjs.com/package/@wordpress/dependency-extraction-webpack-plugin))
+in a structured and scalable way.
 This streamlines asset management in WordPress themes and plugins.
 
 ## Features
