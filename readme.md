@@ -18,7 +18,7 @@ This streamlines asset management in WordPress themes and plugins.
 You can install WPAssets via Composer. Run the following command in your WordPress, theme or plugin directory:
 
 ```bash
-composer require mb/wpassets
+composer require milbareu/wordpress-webpack-asset-manager
 ```
 
 ## 1. Enqueueing Assets in WordPress
