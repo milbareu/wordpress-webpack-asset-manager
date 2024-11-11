@@ -12,7 +12,7 @@ class WPAssets
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.5';
+    const VERSION = '1.0.6';
 
     /**
      * Base directory for public assets.
@@ -76,9 +76,9 @@ class WPAssets
      *
      * @param string $assetName The name of the asset (e.g., 'main.css', 'main.js', 'scripts/main.js').
      * @param bool $getContents Whether to return the content (true) or URL (false).
-     * @return string|null Returns the URL or contents of the asset, or null if not found.
+     * @return string|null|\WP_Error Returns the URL or contents of the asset, or null if not found.
      */
-    public static function getAsset(string $assetName, bool $getContents = false): ?string
+    public static function getAsset(string $assetName, bool $getContents = false): string|null|\WP_Error
     {
         $manifest = self::getManifestContent();
 
@@ -89,7 +89,7 @@ class WPAssets
 
             // Check again if the normalized asset exists in the manifest
             if (!isset($manifest[$assetName])) {
-                wp_die("Asset '{$assetName}' not found in the manifest.");
+                return new \WP_Error('asset_file_missing',"Asset '{$assetName}' not found in the manifest.");
             }
         }
 
@@ -102,7 +102,7 @@ class WPAssets
             if (file_exists($filePath)) {
                 return file_get_contents($filePath);
             }
-            wp_die("Asset file '{$filePath}' not found.");
+            return new \WP_Error('asset_file_missing',"Asset file '{$filePath}' not found.");
         }
 
         // Otherwise, return the URL of the asset
