@@ -164,6 +164,19 @@ Example:
 ]
 ```
 
+## 6. Overriding the Output Directory
+
+The default output directory for assets is `public`. You can customize this by adding a `wpassets_output_dir` filter in your theme or plugin. For example:
+
+```php
+add_filter('wpassets_output_dir', function($dir) {
+    // Override the default output directory 'public'
+    return 'my-custom-assets';
+});
+```
+
+WPAssets will then use your specified directory when generating URLs and file paths via `getBaseUrl()` and `getBaseDir()`.
+
 ## Contribution
 
 Feel free to contribute by submitting issues or pull requests. Your contributions help improve this project and make it

@@ -12,7 +12,7 @@ class WPAssets
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.6';
+    const VERSION = '1.0.7';
 
     /**
      * Base directory for public assets.
@@ -20,6 +20,16 @@ class WPAssets
      * @var string
      */
     protected static $outputDir = 'public';
+
+    /**
+     * Get the output directory, allowing themes to override via filter 'wpassets_output_dir'.
+     *
+     * @return string
+     */
+    protected static function getOutputDir(): string
+    {
+        return apply_filters('wpassets_output_dir', self::$outputDir);
+    }
 
     /**
      * Load the manifest.json file content.
@@ -265,7 +275,7 @@ class WPAssets
             throw new Exception('get_template_directory_uri() function is not available.');
         }
 
-        return get_template_directory_uri() . '/' . self::$outputDir;
+        return get_template_directory_uri() . '/' . self::getOutputDir();
     }
 
     /**
@@ -280,6 +290,6 @@ class WPAssets
             throw new Exception('get_template_directory() function is not available.');
         }
 
-        return get_template_directory() . '/' . self::$outputDir;
+        return get_template_directory() . '/' . self::getOutputDir();
     }
 }
