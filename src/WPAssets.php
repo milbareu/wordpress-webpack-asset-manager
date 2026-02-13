@@ -12,7 +12,7 @@ class WPAssets
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.7';
+    const VERSION = '1.0.8';
 
     /**
      * Base directory for public assets.
@@ -33,6 +33,7 @@ class WPAssets
 
     /**
      * Load the manifest.json file content.
+     * Automatically loads from child theme if active, otherwise from parent theme.
      *
      * @return array
      */
@@ -99,7 +100,7 @@ class WPAssets
 
             // Check again if the normalized asset exists in the manifest
             if (!isset($manifest[$assetName])) {
-                return new \WP_Error('asset_file_missing',"Asset '{$assetName}' not found in the manifest.");
+                return new \WP_Error('asset_file_missing', "Asset '{$assetName}' not found in the manifest.");
             }
         }
 
@@ -112,7 +113,7 @@ class WPAssets
             if (file_exists($filePath)) {
                 return file_get_contents($filePath);
             }
-            return new \WP_Error('asset_file_missing',"Asset file '{$filePath}' not found.");
+            return new \WP_Error('asset_file_missing', "Asset file '{$filePath}' not found.");
         }
 
         // Otherwise, return the URL of the asset
@@ -265,31 +266,33 @@ class WPAssets
 
     /**
      * Get the base URL of the public directory.
+     * Automatically uses child theme if active, otherwise parent theme.
      *
      * @return string
      * @throws Exception
      */
     protected static function getBaseUrl(): string
     {
-        if (!function_exists('get_template_directory_uri')) {
-            throw new Exception('get_template_directory_uri() function is not available.');
+        if (!function_exists('get_stylesheet_directory_uri')) {
+            throw new Exception('get_stylesheet_directory_uri() function is not available.');
         }
 
-        return get_template_directory_uri() . '/' . self::getOutputDir();
+        return get_stylesheet_directory_uri() . '/' . self::getOutputDir();
     }
 
     /**
      * Get the base directory of the public directory (server-side path).
+     * Automatically uses child theme if active, otherwise parent theme.
      *
      * @return string
      * @throws Exception
      */
     protected static function getBaseDir(): string
     {
-        if (!function_exists('get_template_directory')) {
-            throw new Exception('get_template_directory() function is not available.');
+        if (!function_exists('get_stylesheet_directory')) {
+            throw new Exception('get_stylesheet_directory() function is not available.');
         }
 
-        return get_template_directory() . '/' . self::getOutputDir();
+        return get_stylesheet_directory() . '/' . self::getOutputDir();
     }
 }
