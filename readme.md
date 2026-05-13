@@ -14,6 +14,9 @@ This streamlines asset management in WordPress themes and plugins.
 - Bundle-Based Asset Management: Manage your assets by bundling them into logical entry points.
 - Namespace Support: Add a custom namespace prefix to your assets for better organization.
 - PHP Dependency Support: Automatically includes PHP files as part of the asset dependencies.
+- Child Theme / Parent Theme Awareness: Loads assets from the active stylesheet by default, with an option to force parent-theme manifests.
+- Sage 9 Detection: Automatically detects Sage 9-style theme structures and adjusts asset base paths accordingly.
+- WordPress Filter Hooks: Override the output directory and Sage detection logic without modifying the library.
 
 ## Install via Composer
 
@@ -21,6 +24,12 @@ You can install WPAssets via Composer. Run the following command in your WordPre
 
 ```bash
 composer require milbareu/wordpress-webpack-asset-manager
+```
+
+Then import the class where you want to use it:
+
+```php
+use MB\WPAssets\WPAssets;
 ```
 
 ## 1. Enqueueing Assets in WordPress
@@ -113,6 +122,16 @@ manifest.json:
 
 ## 4. Function Reference
 
+`getVersion(): string`
+
+Returns the current library version.
+
+Example:
+
+```php
+$version = WPAssets::getVersion();
+```
+
 `enqueueBundle(string $entry, string $namespace = 'wpa')`
 Enqueues the CSS, JS, and PHP files for a specified entry point.
 
@@ -150,6 +169,26 @@ Example:
 $deps = WPAssets::getAssetDependencies('main.js');
 ```
 
+`isSage9(): bool`
+
+Detects whether the currently active theme appears to be a Sage 9 theme.
+
+Detection uses the first matching heuristic:
+
+- the `App\Sage` class exists,
+- `config/theme.php` exists in the active theme,
+- `resources/views` exists in the active theme.
+
+The detected value is cached in the global `WPASSETS_IS_SAGE9` constant on first use and can be overridden with the `wpassets_is_sage9` filter.
+
+Example:
+
+```php
+if (WPAssets::isSage9()) {
+    // Load additional Sage 9-specific integrations.
+}
+```
+
 ## 5. Advanced Usage
 
 To include specific PHP files from your Webpack configuration, ensure they are listed in the php key under the
@@ -159,9 +198,33 @@ bundle is enqueued.
 Example:
 
 ```json
-"php": [
-"/scripts/main.asset.php"
-]
+{
+  "php": [
+    "/scripts/main.asset.php"
+  ]
+}
+```
+
+### 5.1 Sage 9 theme support
+
+When `WPAssets::isSage9()` returns `true`, the library adjusts the base URL and base directory resolution to match Sage 9-style theme structures before appending the configured output directory.
+
+If the automatic detection is not correct for your project, you can override it:
+
+```php
+add_filter('wpassets_is_sage9', '__return_true');
+// or
+add_filter('wpassets_is_sage9', '__return_false');
+```
+
+This is especially useful for custom Sage-based themes or migration scenarios where the directory structure does not fully match the default heuristics.
+
+### 5.2 Force loading assets from the parent theme
+
+By default, WPAssets reads manifests and assets from the active stylesheet directory (child theme if one is active). To always use the parent theme instead:
+
+```php
+add_filter('wpassets_use_parent_theme_manifest', '__return_true');
 ```
 
 ## 6. Overriding the Output Directory
@@ -176,6 +239,14 @@ add_filter('wpassets_output_dir', function($dir) {
 ```
 
 WPAssets will then use your specified directory when generating URLs and file paths via `getBaseUrl()` and `getBaseDir()`.
+
+## 7. Available WordPress filters
+
+WPAssets exposes a few filters so you can adapt it to your theme structure:
+
+- `wpassets_output_dir`: Changes the asset output directory. Default: `public`.
+- `wpassets_is_sage9`: Overrides automatic Sage 9 detection.
+- `wpassets_use_parent_theme_manifest`: Forces lookup to use the parent theme instead of the active stylesheet directory.
 
 ## Contribution
 

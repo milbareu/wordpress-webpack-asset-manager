@@ -12,14 +12,14 @@ class WPAssets
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.9';
+    const VERSION = '1.1.0';
 
     /**
      * Base directory for public assets.
      *
      * @var string
      */
-    protected static $outputDir = 'public';
+    protected static string $outputDir = 'public';
 
     /**
      * Get the output directory, allowing themes to override via filter 'wpassets_output_dir'.
@@ -36,6 +36,7 @@ class WPAssets
      * Automatically loads from child theme if active, otherwise from parent theme.
      *
      * @return array
+     * @throws Exception
      */
     protected static function getManifestContent(): array
     {
@@ -82,7 +83,7 @@ class WPAssets
     public static function isSage9(): bool
     {
         if (defined('WPASSETS_IS_SAGE9')) {
-            return (bool) WPASSETS_IS_SAGE9;
+            return WPASSETS_IS_SAGE9;
         }
 
         $themeDir = function_exists('get_stylesheet_directory') ? get_stylesheet_directory() : '';
@@ -92,7 +93,7 @@ class WPAssets
             ($themeDir && file_exists($themeDir . '/config/theme.php')) ||
             ($themeDir && is_dir($themeDir . '/resources/views'));
 
-        $result = (bool) apply_filters('wpassets_is_sage9', $detected);
+        $result = (bool)apply_filters('wpassets_is_sage9', $detected);
 
         define('WPASSETS_IS_SAGE9', $result);
 
@@ -108,9 +109,9 @@ class WPAssets
     protected static function normalizeAssetName(string $entry, bool $stripExtension = false): string
     {
         // Remove 'scripts/' or 'styles/' prefixes
-        if (strpos($entry, 'scripts/') === 0) {
+        if (str_starts_with($entry, 'scripts/')) {
             $entry = str_replace('scripts/', '', $entry);
-        } elseif (strpos($entry, 'styles/') === 0) {
+        } elseif (str_starts_with($entry, 'styles/')) {
             $entry = str_replace('styles/', '', $entry);
         }
 
@@ -128,6 +129,7 @@ class WPAssets
      * @param string $assetName The name of the asset (e.g., 'main.css', 'main.js', 'scripts/main.js').
      * @param bool $getContents Whether to return the content (true) or URL (false).
      * @return string|null|\WP_Error Returns the URL or contents of the asset, or null if not found.
+     * @throws Exception
      */
     public static function getAsset(string $assetName, bool $getContents = false): string|null|\WP_Error
     {
@@ -140,7 +142,7 @@ class WPAssets
 
             // Check again if the normalized asset exists in the manifest
             if (!isset($manifest[$assetName])) {
-                return new \WP_Error('asset_file_missing', "Asset '{$assetName}' not found in the manifest.");
+                return new \WP_Error('asset_file_missing', "Asset '$assetName' not found in the manifest.");
             }
         }
 
@@ -153,7 +155,7 @@ class WPAssets
             if (file_exists($filePath)) {
                 return file_get_contents($filePath);
             }
-            return new \WP_Error('asset_file_missing', "Asset file '{$filePath}' not found.");
+            return new \WP_Error('asset_file_missing', "Asset file '$filePath' not found.");
         }
 
         // Otherwise, return the URL of the asset
@@ -166,6 +168,7 @@ class WPAssets
      * @param string $entry The name of the entry (e.g., 'main', 'editor').
      * @param string $namespace The namespace prefix for the assets (e.g., 'wpa').
      * @return void
+     * @throws Exception
      */
     public static function enqueueBundle(string $entry, string $namespace = 'wpa'): void
     {
@@ -177,7 +180,7 @@ class WPAssets
 
         // Check if the entry exists in the manifest
         if (!isset($manifest['entrypoints'][$normalizedEntry])) {
-            wp_die("Entry point '{$entry}' does not exist in manifest.json.");
+            wp_die("Entry point '$entry' does not exist in manifest.json.");
         }
 
         $assets = $manifest['entrypoints'][$normalizedEntry]['assets'];
@@ -195,11 +198,12 @@ class WPAssets
      * @param string $namespace The namespace prefix for the assets.
      * @param string $entry The normalized entry name.
      * @return void
+     * @throws Exception
      */
     protected static function enqueueCssFiles(array $cssFiles, string $namespace, string $entry): void
     {
         foreach ($cssFiles as $css) {
-            wp_enqueue_style("{$namespace}/{$entry}-style", self::getBaseUrl() . $css, [], null);
+            wp_enqueue_style("$namespace/$entry-style", self::getBaseUrl() . $css, [], null);
         }
     }
 
@@ -210,13 +214,14 @@ class WPAssets
      * @param string $namespace The namespace prefix for the assets.
      * @param string $entry The normalized entry name.
      * @return void
+     * @throws Exception
      */
     protected static function enqueueJsFiles(array $jsFiles, string $namespace, string $entry): void
     {
         $dependencies = self::getAssetDependencies($entry);
 
         foreach ($jsFiles as $js) {
-            wp_enqueue_script("{$namespace}/{$entry}-script", self::getBaseUrl() . $js, $dependencies['dependencies'], $dependencies['version'], true);
+            wp_enqueue_script("$namespace/$entry-script", self::getBaseUrl() . $js, $dependencies['dependencies'], $dependencies['version'], true);
         }
     }
 
@@ -225,6 +230,7 @@ class WPAssets
      *
      * @param array $phpFiles List of PHP file paths.
      * @return void
+     * @throws Exception
      */
     protected static function includePhpFiles(array $phpFiles): void
     {
@@ -242,6 +248,7 @@ class WPAssets
      *
      * @param string $entry The entry name (e.g., 'main', 'editor') or a single file (e.g., 'main.js').
      * @return array
+     * @throws Exception
      */
     public static function getAssetDependencies(string $entry): array
     {
@@ -276,6 +283,7 @@ class WPAssets
      * @param array $manifest The manifest content
      * @param string $entry The entry name (e.g., 'main', 'editor')
      * @return string|null Returns the full PHP file path or null if not found
+     * @throws Exception
      */
     protected static function getPhpFileFromBundle(array $manifest, string $entry): ?string
     {
@@ -297,6 +305,7 @@ class WPAssets
      *
      * @param string $entry The entry name (e.g., 'main.js')
      * @return string|null Returns the PHP file path or null if not found
+     * @throws Exception
      */
     protected static function getPhpFileFromSingleAsset(string $entry): ?string
     {
@@ -315,17 +324,21 @@ class WPAssets
      */
     protected static function getBaseUrl(): string
     {
-        if (!function_exists('get_stylesheet_directory_uri')) {
-            throw new Exception('get_stylesheet_directory_uri() function is not available.');
+        $useParentTheme = (bool)apply_filters('wpassets_use_parent_theme_manifest', false);
+
+        $dirFunction = $useParentTheme ? 'get_template_directory_uri' : 'get_stylesheet_directory_uri';
+
+        if (!function_exists($dirFunction)) {
+            throw new Exception("$dirFunction() function is not available.");
         }
+
+        $dir = $dirFunction();
 
         if (self::isSage9()) {
-            // In Sage 9, get_stylesheet_directory_uri() points to the resources/
-            // subfolder, so go up one level to reach the actual theme root.
-            return dirname(get_stylesheet_directory_uri()) . '/' . self::getOutputDir();
+            $dir = dirname($dir);
         }
 
-        return get_stylesheet_directory_uri() . '/' . self::getOutputDir();
+        return $dir . '/' . self::getOutputDir();
     }
 
     /**
@@ -339,16 +352,20 @@ class WPAssets
      */
     protected static function getBaseDir(): string
     {
-        if (!function_exists('get_stylesheet_directory')) {
-            throw new Exception('get_stylesheet_directory() function is not available.');
+        $useParentTheme = (bool)apply_filters('wpassets_use_parent_theme_manifest', false);
+
+        $dirFunction = $useParentTheme ? 'get_template_directory' : 'get_stylesheet_directory';
+
+        if (!function_exists($dirFunction)) {
+            throw new Exception("$dirFunction() function is not available.");
         }
+
+        $dir = $dirFunction();
 
         if (self::isSage9()) {
-            // In Sage 9, get_stylesheet_directory() points to the resources/
-            // subfolder, so go up one level to reach the actual theme root.
-            return dirname(get_stylesheet_directory()) . '/' . self::getOutputDir();
+            $dir = dirname($dir);
         }
 
-        return get_stylesheet_directory() . '/' . self::getOutputDir();
+        return $dir . '/' . self::getOutputDir();
     }
 }
