@@ -11,6 +11,11 @@ module.exports = merge(common, {
     filename: 'scripts/[name].js',
   },
   devtool: 'source-map',
+  watchOptions: {
+    poll: 1000,  // Check for changes every second
+    aggregateTimeout: 300,  // Delay the rebuild after the first change
+    ignored: /node_modules/,  // Ignore changes in node_modules
+  },
   plugins: [
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify('development'),
@@ -19,16 +24,20 @@ module.exports = merge(common, {
       filename: 'styles/[name].css',
     }),
     new BrowserSyncPlugin({
-      host: 'localhost',
       port: 3000,
       proxy: config.proxyUrl,
+      reloadOnRestart: true,
+      injectChanges: true,
+      open: false,
+      notify: false,
       files: [
-        `${config.paths.output}/scripts/*.js`,
-        `${config.paths.output}/styles/*.css`,
-        './**/*.php',
+        `${config.paths.themePath}/**/*.js`,
+        `${config.paths.themePath}/**/*.css`,
+        `${config.paths.themePath}/**/*.scss`,
+        `${config.paths.themePath}/**/*.php`,
       ],
     }, {
-      reload: false,
+      reload: true,
     }),
   ],
 });

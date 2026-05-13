@@ -12,7 +12,7 @@ class WPAssets
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.0.8';
+    const VERSION = '1.0.9';
 
     /**
      * Base directory for public assets.
@@ -42,7 +42,7 @@ class WPAssets
         $manifestPath = self::getBaseDir() . '/manifest.json';
 
         if (!file_exists($manifestPath)) {
-            wp_die('Manifest file is missing.');
+            wp_die($manifestPath, 'Manifest file is missing.');
         }
 
         $manifest = file_get_contents($manifestPath);
@@ -57,6 +57,46 @@ class WPAssets
     public static function getVersion(): string
     {
         return self::VERSION;
+    }
+
+    /**
+     * Determine whether the currently active theme is Sage 9.
+     *
+     * Detection is based on three heuristics (any one is sufficient):
+     *  1. The `App\Sage` class is loaded (registered by Sage 9's ServiceProvider).
+     *  2. A `config/theme.php` file exists inside the active theme directory
+     *     (Sage 9 ships this file; Sage 10+ does not).
+     *  3. A `resources/views` directory exists inside the active theme (Blade
+     *     template directory introduced in Sage 9).
+     *
+     * Themes or plugins can override the result via the `wpassets_is_sage9` filter:
+     *
+     *   add_filter('wpassets_is_sage9', '__return_true');
+     *   add_filter('wpassets_is_sage9', '__return_false');
+     *
+     * A `WPASSETS_IS_SAGE9` constant (bool) is also defined on the first call so
+     * the value is available globally without calling this method every time.
+     *
+     * @return bool
+     */
+    public static function isSage9(): bool
+    {
+        if (defined('WPASSETS_IS_SAGE9')) {
+            return (bool) WPASSETS_IS_SAGE9;
+        }
+
+        $themeDir = function_exists('get_stylesheet_directory') ? get_stylesheet_directory() : '';
+
+        $detected =
+            class_exists('App\\Sage') ||
+            ($themeDir && file_exists($themeDir . '/config/theme.php')) ||
+            ($themeDir && is_dir($themeDir . '/resources/views'));
+
+        $result = (bool) apply_filters('wpassets_is_sage9', $detected);
+
+        define('WPASSETS_IS_SAGE9', $result);
+
+        return $result;
     }
 
     /**
@@ -267,6 +307,8 @@ class WPAssets
     /**
      * Get the base URL of the public directory.
      * Automatically uses child theme if active, otherwise parent theme.
+     * For Sage 9 themes the output directory suffix is omitted because Sage 9
+     * serves compiled assets directly from the theme root (resources/).
      *
      * @return string
      * @throws Exception
@@ -277,12 +319,20 @@ class WPAssets
             throw new Exception('get_stylesheet_directory_uri() function is not available.');
         }
 
+        if (self::isSage9()) {
+            // In Sage 9, get_stylesheet_directory_uri() points to the resources/
+            // subfolder, so go up one level to reach the actual theme root.
+            return dirname(get_stylesheet_directory_uri()) . '/' . self::getOutputDir();
+        }
+
         return get_stylesheet_directory_uri() . '/' . self::getOutputDir();
     }
 
     /**
      * Get the base directory of the public directory (server-side path).
      * Automatically uses child theme if active, otherwise parent theme.
+     * For Sage 9 themes the output directory suffix is omitted because Sage 9
+     * serves compiled assets directly from the theme root (resources/).
      *
      * @return string
      * @throws Exception
@@ -291,6 +341,12 @@ class WPAssets
     {
         if (!function_exists('get_stylesheet_directory')) {
             throw new Exception('get_stylesheet_directory() function is not available.');
+        }
+
+        if (self::isSage9()) {
+            // In Sage 9, get_stylesheet_directory() points to the resources/
+            // subfolder, so go up one level to reach the actual theme root.
+            return dirname(get_stylesheet_directory()) . '/' . self::getOutputDir();
         }
 
         return get_stylesheet_directory() . '/' . self::getOutputDir();

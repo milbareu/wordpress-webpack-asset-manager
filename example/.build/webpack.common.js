@@ -1,7 +1,7 @@
 const DependencyExtractionWebpackPlugin = require('@wordpress/dependency-extraction-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const WebpackAssetsManifest = require('webpack-assets-manifest');
+const { WebpackAssetsManifest } = require('webpack-assets-manifest');
 const config = require('../config');
 const {CleanWebpackPlugin} = require("clean-webpack-plugin");
 const TerserPlugin = require('terser-webpack-plugin');
@@ -13,7 +13,7 @@ module.exports = {
     version: false,
     timings: false,
     children: false,
-    errors: false,
+    errors: true,
     errorDetails: false,
     warnings: false,
     chunks: false,
@@ -38,8 +38,18 @@ module.exports = {
         test: /\.scss$/,
         use: [
           MiniCssExtractPlugin.loader,
-          'css-loader',
-          'sass-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              url: false
+            }
+          },
+          {
+            loader: 'sass-loader',
+            options: {
+              sourceMap: true,
+            }
+          }
         ],
       },
       {
