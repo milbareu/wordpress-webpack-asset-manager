@@ -12,7 +12,7 @@ class WPAssets
     /**
      * Version of the AssetManager module.
      */
-    const VERSION = '1.1.0';
+    const VERSION = '1.2.1';
 
     /**
      * Base directory for public assets.
@@ -63,12 +63,16 @@ class WPAssets
     /**
      * Determine whether the currently active theme is Sage 9.
      *
-     * Detection is based on three heuristics (any one is sufficient):
+     * Detection is based on three heuristics (any one is sufficient),
+     * AND the theme must not be detected as Sage 10+:
      *  1. The `App\Sage` class is loaded (registered by Sage 9's ServiceProvider).
      *  2. A `config/theme.php` file exists inside the active theme directory
      *     (Sage 9 ships this file; Sage 10+ does not).
      *  3. A `resources/views` directory exists inside the active theme (Blade
      *     template directory introduced in Sage 9).
+     *
+     * Sage 10+ is excluded by checking for the presence of
+     * `Roots\Acorn\Sage\SageServiceProvider` (introduced in Sage 10 / Acorn).
      *
      * Themes or plugins can override the result via the `wpassets_is_sage9` filter:
      *
@@ -84,6 +88,13 @@ class WPAssets
     {
         if (defined('WPASSETS_IS_SAGE9')) {
             return WPASSETS_IS_SAGE9;
+        }
+
+        // Sage 10+ uses Acorn — if its service provider exists this is not Sage 9
+        if (class_exists('Roots\\Acorn\\Sage\\SageServiceProvider')) {
+            $result = false;
+            define('WPASSETS_IS_SAGE9', $result);
+            return $result;
         }
 
         $themeDir = function_exists('get_stylesheet_directory') ? get_stylesheet_directory() : '';
@@ -124,6 +135,45 @@ class WPAssets
     }
 
     /**
+     * For a .asset.php asset name (e.g. 'scripts/editor.asset.php'), derive the
+     * hashed path from the corresponding JS entry in the manifest.
+     *
+     * @param array $manifest
+     * @param string $assetName
+     * @return string|null The manifest key (e.g. 'scripts/editor.abc123.asset.php')
+     */
+    protected static function resolveAssetPhpFromJs(array $manifest, string $assetName): ?string
+    {
+        // scripts/editor.asset.php -> scripts/editor.js
+        $jsName = preg_replace('/\.asset\.php$/', '.js', $assetName);
+
+        // Try as-is
+        $jsValue = $manifest[$jsName] ?? null;
+
+        if (!$jsValue) {
+            // Try normalized (e.g., 'main.js')
+            $normalizedJs = self::normalizeAssetName($jsName);
+            $jsValue = $manifest[$normalizedJs] ?? null;
+        }
+
+        if (!$jsValue && isset($manifest['/'. $jsName])) {
+            $jsValue = $manifest['/' . $jsName];
+        }
+
+        if ($jsValue) {
+            $jsValue = ltrim($jsValue, '/');
+            // scripts/editor.abc123.js -> scripts/editor.abc123.asset.php
+            $phpKey = preg_replace('/\.js$/', '.asset.php', $jsValue);
+
+            if (isset($manifest[$phpKey])) {
+                return $phpKey;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Get the URL or contents of a single asset.
      *
      * @param string $assetName The name of the asset (e.g., 'main.css', 'main.js', 'scripts/main.js').
@@ -135,26 +185,52 @@ class WPAssets
     {
         $manifest = self::getManifestContent();
 
-        // First, check if the asset exists in the manifest with the full path
-        if (!isset($manifest[$assetName])) {
-            // If not found, try without the path (normalize)
-            $assetName = self::normalizeAssetName($assetName);
+        // Resolve the actual manifest key
+        $resolvedKey = null;
 
-            // Check again if the normalized asset exists in the manifest
-            if (!isset($manifest[$assetName])) {
-                return new \WP_Error('asset_file_missing', "Asset '$assetName' not found in the manifest.");
+        // 1. Try direct lookup
+        if (isset($manifest[$assetName])) {
+            $resolvedKey = $assetName;
+        }
+
+        // 2. Try normalized name
+        if (!$resolvedKey) {
+            $normalized = self::normalizeAssetName($assetName);
+            if (isset($manifest[$normalized])) {
+                $resolvedKey = $normalized;
             }
         }
 
+        // 3. For .asset.php files, derive from matching JS entry
+        if (!$resolvedKey && str_ends_with($assetName, '.asset.php')) {
+            $derived = self::resolveAssetPhpFromJs($manifest, $assetName);
+            if ($derived) {
+                $resolvedKey = $derived;
+            }
+        }
+
+        if (!$resolvedKey) {
+            return new \WP_Error('asset_file_missing', "Asset '$assetName' not found in the manifest.");
+        }
+
+        $manifestValue = $manifest[$resolvedKey];
+
         // Construct the asset's path (either URL or filesystem path)
-        $assetPath = self::getBaseUrl() . $manifest[$assetName];
-        $filePath = self::getBaseDir() . $manifest[$assetName];
+        $assetPath = self::getBaseUrl() . $manifestValue;
+        $filePath = self::getBaseDir() . $manifestValue;
 
         // If requested, return the content of the asset
         if ($getContents) {
             if (file_exists($filePath)) {
                 return file_get_contents($filePath);
             }
+
+            // Fallback: try without the leading slash in $filePath
+            $filePath = self::getBaseDir() . '/' . ltrim($manifestValue, '/');
+            if (file_exists($filePath)) {
+                return file_get_contents($filePath);
+            }
+
             return new \WP_Error('asset_file_missing', "Asset file '$filePath' not found.");
         }
 
@@ -187,7 +263,7 @@ class WPAssets
 
         // Enqueue all types of assets
         self::enqueueCssFiles($assets['css'] ?? [], $namespace, $normalizedEntry);
-        self::enqueueJsFiles($assets['js'] ?? [], $namespace, $normalizedEntry);
+        self::enqueueJsFiles($assets['js'] ?? [], $manifest, $namespace, $normalizedEntry);
         self::includePhpFiles($assets['php'] ?? []);
     }
 
@@ -211,14 +287,15 @@ class WPAssets
      * Enqueue JS files with their dependencies for a given entry.
      *
      * @param array $jsFiles List of JS file paths.
+     * @param array $manifest The manifest content.
      * @param string $namespace The namespace prefix for the assets.
      * @param string $entry The normalized entry name.
      * @return void
      * @throws Exception
      */
-    protected static function enqueueJsFiles(array $jsFiles, string $namespace, string $entry): void
+    protected static function enqueueJsFiles(array $jsFiles, array $manifest, string $namespace, string $entry): void
     {
-        $dependencies = self::getAssetDependencies($entry);
+        $dependencies = self::getAssetDependencies($entry, $manifest);
 
         foreach ($jsFiles as $js) {
             wp_enqueue_script("$namespace/$entry-script", self::getBaseUrl() . $js, $dependencies['dependencies'], $dependencies['version'], true);
@@ -247,20 +324,26 @@ class WPAssets
      * Get the dependencies from the corresponding .asset.php file.
      *
      * @param string $entry The entry name (e.g., 'main', 'editor') or a single file (e.g., 'main.js').
+     * @param array|null $manifest Optional pre-loaded manifest content.
      * @return array
      * @throws Exception
      */
-    public static function getAssetDependencies(string $entry): array
+    public static function getAssetDependencies(string $entry, ?array $manifest = null): array
     {
         // Normalize the entry name
         $entry = self::normalizeAssetName($entry, true);
 
-        $manifest = self::getManifestContent();
+        $manifest = $manifest ?? self::getManifestContent();
 
         // Try to get PHP asset from a bundle entrypoint
         $phpFilePath = self::getPhpFileFromBundle($manifest, $entry);
 
-        // If no PHP asset is found in the bundle, check if it's a single asset
+        // If not found, derive from the entry's JS file in entrypoints
+        if (!$phpFilePath) {
+            $phpFilePath = self::getPhpFileFromEntryJs($manifest, $entry);
+        }
+
+        // If still not found, check if it's a single asset
         if (!$phpFilePath) {
             $phpFilePath = self::getPhpFileFromSingleAsset($entry);
         }
@@ -275,6 +358,51 @@ class WPAssets
             'dependencies' => [],
             'version' => null,
         ];
+    }
+
+    /**
+     * Derive the .asset.php file path from the entry's JS output in entrypoints.
+     *
+     * @param array $manifest The manifest content
+     * @param string $entry The normalized entry name (e.g., 'main', 'editor')
+     * @return string|null Returns the full PHP file path or null if not found
+     * @throws Exception
+     */
+    protected static function getPhpFileFromEntryJs(array $manifest, string $entry): ?string
+    {
+        $jsFiles = $manifest['entrypoints'][$entry]['assets']['js'] ?? [];
+
+        if (empty($jsFiles)) {
+            return null;
+        }
+
+        // Take the first JS file and resolve its hashed path through the manifest
+        $firstJs = ltrim($jsFiles[0], '/');
+        $resolvedJs = $manifest[$firstJs] ?? null;
+
+        if ($resolvedJs) {
+            $resolvedJs = ltrim($resolvedJs, '/');
+        } else {
+            $resolvedJs = $firstJs;
+        }
+
+        $assetPhpKey = preg_replace('/\.js$/', '.asset.php', $resolvedJs);
+
+        // Look up in manifest flat keys
+        if (isset($manifest[$assetPhpKey])) {
+            $fullPath = self::getBaseDir() . '/' . ltrim($manifest[$assetPhpKey], '/');
+            if (file_exists($fullPath)) {
+                return $fullPath;
+            }
+        }
+
+        // Try direct filesystem path
+        $fullPath = self::getBaseDir() . '/' . $assetPhpKey;
+        if (file_exists($fullPath)) {
+            return $fullPath;
+        }
+
+        return null;
     }
 
     /**

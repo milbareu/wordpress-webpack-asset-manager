@@ -85,7 +85,7 @@ In your Webpack configuration files (see the example/ folder):
 ## 3. Webpack Manifest Structure
 
 Your Webpack configuration should output a manifest.json with an entrypoints object. Below is a sample structure for
-manifest.json:
+manifest.json (shown without content hashes for clarity; in production `WebpackAssetsManifest` will append hashes):
 
 ```json
 {
@@ -97,9 +97,6 @@ manifest.json:
         ],
         "js": [
           "/scripts/main.js"
-        ],
-        "php": [
-          "/scripts/main.asset.php"
         ]
       }
     },
@@ -110,15 +107,30 @@ manifest.json:
         ],
         "js": [
           "/scripts/editor.js"
-        ],
-        "php": [
-          "/scripts/editor.asset.php"
         ]
       }
     }
-  }
+  },
+  "scripts/main.js": "/scripts/main.abc123.js",
+  "scripts/main.abc123.asset.php": "/scripts/main.abc123.asset.php",
+  "scripts/editor.js": "/scripts/editor.abc123.js",
+  "scripts/editor.abc123.asset.php": "/scripts/editor.abc123.asset.php",
+  "styles/main.css": "/styles/main.abc123.css",
+  "styles/editor.css": "/styles/editor.abc123.css"
 }
 ```
+
+### 3.1 Content Hash Support (v1.2.0+)
+
+When using `[contenthash]` in your Webpack output filenames, the `Dependency Extraction Webpack Plugin` emits
+`.asset.php` files with hashed names (e.g. `editor.abc123.asset.php`). WPAssets v1.2.0 resolves these automatically:
+
+1. Looks for the entry in `manifest.entrypoints[entry].assets.js[0]` → `/scripts/editor.abc123.js`
+2. Derives the `.asset.php` path: `scripts/editor.abc123.asset.php`
+3. Finds it in the manifest flat keys or on the filesystem
+
+This means you can always reference assets by their logical name (`getAssetDependencies('editor')`) regardless of
+whether content hashes are present.
 
 ## 4. Function Reference
 
@@ -157,16 +169,23 @@ Example:
 $mainCssUrl = WPAssets::getAsset('main.css'); // Get URL of main.css
 ```
 
-`getAssetDependencies(string $entry): array`
+`getAssetDependencies(string $entry, ?array $manifest = null): array`
 
 Retrieves the asset dependencies from the corresponding .asset.php file for a given entry.
 
+Supports content-hashed filenames (v1.2.0+). Resolution order:
+
+1. `entrypoints[entry].assets.php[0]` — PHP file listed in the entrypoint.
+2. `entrypoints[entry].assets.js[0]` → derive `.asset.php` path from the JS output.
+3. Filesystem fallback: `{baseDir}/{entry}.asset.php`.
+
 - $entry: The entry name (e.g., 'main.js').
+- $manifest (optional): Pre-loaded manifest array to avoid re-reading the file.
 
 Example:
 
 ```php
-$deps = WPAssets::getAssetDependencies('main.js');
+$deps = WPAssets::getAssetDependencies('editor');
 ```
 
 `isSage9(): bool`
@@ -191,19 +210,10 @@ if (WPAssets::isSage9()) {
 
 ## 5. Advanced Usage
 
-To include specific PHP files from your Webpack configuration, ensure they are listed in the php key under the
-corresponding entry point in manifest.json. These files will be automatically included using include_once when the
-bundle is enqueued.
-
-Example:
-
-```json
-{
-  "php": [
-    "/scripts/main.asset.php"
-  ]
-}
-```
+If your Webpack configuration includes a `php` key under an entrypoint, those files will be included using
+`include_once` when the bundle is enqueued. This is optional — `.asset.php` dependency files emitted by
+`@wordpress/dependency-extraction-webpack-plugin` are resolved automatically from the JS entry even when not
+listed in entrypoints (see section 3.1).
 
 ### 5.1 Sage 9 theme support
 
